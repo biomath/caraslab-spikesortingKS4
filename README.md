@@ -10,10 +10,10 @@ TODO: Try to install Kilosort using a base python distribution
 
 Required before running for the first time:
 - npy-matlab (https://github.com/kwikteam/npy-matlab)
-- Kilosort4 v4.0.37: install Kilosort4 according to the developers' instructions (https://github.com/MouseLand/Kilosort/releases/tag/v4.0.37).
+- Kilosort4 v4.1.3: install Kilosort4 according to the developers' [instructions](https://github.com/MouseLand/Kilosort). Note: v4.1.3 is required.
 - Reinstalling torch within the kilosort environment seems to be a requirement for this to work.
   
         pip uninstall torch
         pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
 
-- Copy the modified run_kilosort.py file into your conda path (e.g., /home/user/miniconda3/envs/kilosort/lib/python3.9/site-packages/kilosort)
+- Copy the modified run_kilosort.py file into your conda path (e.g., /home/user/miniconda3/envs/kilosort/lib/python3.11/site-packages/kilosort)
