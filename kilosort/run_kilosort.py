@@ -10,11 +10,11 @@ import torch
 
 import kilosort
 from kilosort import (preprocessing, datashift, template_matching, clustering_qr, 
-                      clustering_qr, io, spikedetect, CCG, PROBE_DIR)
+                      clustering_qr, io, spikedetect, CCG, PROBE_DIR)a
 from kilosort.parameters import DEFAULT_SETTINGS
 from kilosort.utils import (
     log_performance, log_cuda_details, probe_as_string, ops_as_string,
-    get_performance, log_sorting_summary
+    get_performance, log_sorting_summary, log_thread_count
     )
 import kilosort.plots as kplots
 
@@ -36,7 +36,7 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
                  data_dtype=None, do_CAR=True, invert_sign=False, device=None,
                  progress_bar=None, save_extra_vars=False, clear_cache=False,
                  save_preprocessed_copy=False, bad_channels=None, shank_idx=None,
-                 verbose_console=False, verbose_log=False):
+                 verbose_console=False, verbose_log=False, torch_thread_lim=None):
     """Run full spike sorting pipeline on specified data.
     
     Parameters
@@ -120,6 +120,9 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
         If True, include additional debug-level logging statements for some
         steps. This provides more detail for debugging, but may impact
         performance.
+    torch_thread_lim : int; optional.
+        If set, this will limit the number of pytorch threads on CPU.
+        See docs for `torch.set_num_threads`.
     
     Raises
     ------
@@ -163,6 +166,8 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
     For documentation of saved files, see `kilosort.io.save_to_phy`.
 
     """
+    if torch_thread_lim is not None:
+        torch.set_num_threads(torch_thread_lim)
 
     # Configure settings, ops, and file paths
     if settings is None or settings.get('n_chan_bin', None) is None:
@@ -261,6 +266,7 @@ def _sort(filename, results_dir, probe, settings, data_dtype, device, do_CAR,
 
         # Baseline performance metrics
         log_performance(logger, 'info', 'Resource usage before sorting')
+        log_thread_count(logger)
 
         # Set preprocessing and drift correction parameters
         ops = compute_preprocessing(ops, device, tic0=tic0, file_object=file_object)
@@ -272,6 +278,8 @@ def _sort(filename, results_dir, probe, settings, data_dtype, device, do_CAR,
             file_object=file_object, clear_cache=clear_cache,
             verbose=verbose_log
             )
+
+        log_thread_count(logger)
 
         # Save preprocessing steps
         if save_preprocessed_copy:
@@ -296,6 +304,8 @@ def _sort(filename, results_dir, probe, settings, data_dtype, device, do_CAR,
             clear_cache=clear_cache, verbose=verbose_log
             )
 
+        log_thread_count(logger)
+
         logger.info('Generating diagnostic plots ...')
         if gui_sorter is not None:
             gui_sorter.Wall0 = Wall0
@@ -305,13 +315,16 @@ def _sort(filename, results_dir, probe, settings, data_dtype, device, do_CAR,
         else:
             # MML: MatLab crashes when matplotlib.pyplot is called for some reason.
             # Something to do with Anaconda python?
-            pass  
+            pass
             # kplots.plot_diagnostics(Wall0, clu0, ops, results_dir)
 
         clu, Wall, st, tF = cluster_spikes(
             st, tF, ops, device, bfile, tic0=tic0, progress_bar=progress_bar,
             clear_cache=clear_cache, verbose=verbose_log,
             )
+
+        log_thread_count(logger)
+
         ops, similar_templates, is_ref, est_contam_rate, kept_spikes = \
             save_sorting(
                 ops, results_dir, st, clu, tF, Wall, bfile.imin, tic0,
@@ -322,15 +335,16 @@ def _sort(filename, results_dir, probe, settings, data_dtype, device, do_CAR,
         if torch.cuda.is_available():
             ops['cuda_postproc'] = torch.cuda.memory_stats(device)
 
+        log_thread_count(logger)
+
         logger.info('Generating spike position plot ...')
         if gui_sorter is not None:
             gui_sorter.clu = clu[kept_spikes]
             gui_sorter.is_refractory = is_ref
             gui_sorter.plotDataReady.emit('probe')
-        else:
-            # MML: MatLab crashes when matplotlib.pyplot is called for some reason.
+        else:            # MML: MatLab crashes when matplotlib.pyplot is called for some reason.
             # Something to do with Anaconda python?
-            pass  
+            pass
             # kplots.plot_spike_positions(clu[kept_spikes], is_ref, results_dir)
         logger.info('Sorting finished.')
         log_sorting_summary(ops, log=logger, level='info')
@@ -560,7 +574,8 @@ def get_run_parameters(ops) -> list:
         ops['settings']['tmax'],
         ops['settings']['artifact_threshold'],
         ops['settings']['shift'],
-        ops['settings']['scale']
+        ops['settings']['scale'],
+        ops['settings']['batch_downsampling']
     ]
 
     return parameters
@@ -594,7 +609,8 @@ def compute_preprocessing(ops, device, tic0=np.nan, file_object=None):
     logger.info('-'*40)
 
     n_chan_bin, fs, NT, nt, twav_min, chan_map, dtype, do_CAR, invert, \
-        xc, yc, tmin, tmax, artifact, shift, scale = get_run_parameters(ops)
+        xc, yc, tmin, tmax, artifact, shift, scale, batch_downsampling = \
+            get_run_parameters(ops)
     nskip = ops['settings']['nskip']
     whitening_range = ops['settings']['whitening_range']
     
@@ -606,7 +622,8 @@ def compute_preprocessing(ops, device, tic0=np.nan, file_object=None):
                               chan_map, hp_filter, device=device, do_CAR=do_CAR,
                               invert_sign=invert, dtype=dtype, tmin=tmin,
                               tmax=tmax, artifact_threshold=artifact,
-                              shift=shift, scale=scale, file_object=file_object)
+                              shift=shift, scale=scale, file_object=file_object,
+                              batch_downsampling=batch_downsampling)
 
     logger.info(f'N samples: {bfile.n_samples}')
     logger.info(f'N seconds: {bfile.n_samples/fs}')
@@ -684,7 +701,8 @@ def compute_drift_correction(ops, device, tic0=np.nan, progress_bar=None,
     logger.info('-'*40)
 
     n_chan_bin, fs, NT, nt, twav_min, chan_map, dtype, do_CAR, invert, \
-        _, _, tmin, tmax, artifact, shift, scale = get_run_parameters(ops)
+        _, _, tmin, tmax, artifact, shift, scale, batch_downsampling = \
+            get_run_parameters(ops)
     hp_filter = ops['preprocessing']['hp_filter']
     whiten_mat = ops['preprocessing']['whiten_mat']
     bfile = io.BinaryFiltered(
@@ -692,7 +710,7 @@ def compute_drift_correction(ops, device, tic0=np.nan, progress_bar=None,
         hp_filter=hp_filter, whiten_mat=whiten_mat, device=device, do_CAR=do_CAR,
         invert_sign=invert, dtype=dtype, tmin=tmin, tmax=tmax,
         artifact_threshold=artifact, shift=shift, scale=scale,
-        file_object=file_object
+        file_object=file_object, batch_downsampling=batch_downsampling
         )
 
     ops, st = datashift.run(ops, bfile, device=device, progress_bar=progress_bar,
@@ -718,7 +736,7 @@ def compute_drift_correction(ops, device, tic0=np.nan, progress_bar=None,
         hp_filter=hp_filter, whiten_mat=whiten_mat, device=device,
         dshift=ops['dshift'], do_CAR=do_CAR, dtype=dtype, tmin=tmin, tmax=tmax,
         artifact_threshold=artifact, shift=shift, scale=scale,
-        file_object=file_object
+        file_object=file_object, batch_downsampling=batch_downsampling
         )
 
     log_cuda_details(logger)
@@ -791,6 +809,7 @@ def detect_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None,
         raise ValueError('No spikes detected, cannot continue sorting.')
     log_performance(logger, 'info', 'Resource usage after spike detect (univ)',
                     reset=True)
+    log_thread_count(logger)
 
     tic = time.time()
     logger.info(' ')
@@ -816,7 +835,9 @@ def detect_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None,
     logger.debug(f'Wall shape: {Wall.shape}')
     log_performance(logger, 'info', 'Resource usage after first clustering',
                     reset=True)
-    
+   
+    log_thread_count(logger)
+
     tic = time.time()
     logger.info(' ')
     logger.info('Extracting spikes using cluster waveforms')
@@ -824,7 +845,9 @@ def detect_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None,
     st, tF, ops = template_matching.extract(
         ops, bfile, Wall3, device=device, progress_bar=progress_bar
         )
-    
+   
+    log_thread_count(logger)
+
     elapsed = time.time() - tic
     total = time.time() - tic0
     ops['runtime_st'] = elapsed
@@ -902,6 +925,7 @@ def cluster_spikes(st, tF, ops, device, bfile, tic0=np.nan, progress_bar=None,
                 f'total {total:.2f}s')
     logger.debug(f'clu shape: {clu.shape}')
     logger.debug(f'Wall shape: {Wall.shape}')
+    log_thread_count(logger)
 
     tic = time.time()
     logger.info(' ')
