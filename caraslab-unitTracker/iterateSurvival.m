@@ -11,7 +11,9 @@ function [survival, corrscore, wavescore, autoscore, basescore, score] = iterate
 
 survival = cell(numel(correlations)-1,1);
 for iid=1:length(survival)
-    survival{iid} = bsxfun(@eq,shank{iid}(:),shank{iid+1}(:)') & bsxfun(@eq,unit{iid}(:),unit{iid+1}(:)');
+    % survival{iid} = bsxfun(@eq,shank{iid}(:),shank{iid+1}(:)') & bsxfun(@eq,unit{iid}(:),unit{iid+1}(:)');
+    survival{iid} = bsxfun(@eq,shank{iid}(:),shank{iid+1}(:)');
+
 end
 
 corrscore = computeCorrScore(correlations, survival);

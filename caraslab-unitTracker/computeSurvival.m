@@ -1,10 +1,10 @@
 function [survival, score] = computeSurvival(shank, unit, corrscore, wavescore, autoscore, basescore, survival)
 
-    sameChan = cell(size(corrscore));
-    sameUnit = cell(size(corrscore));
+    sameShank = cell(size(corrscore));
+    % sameUnit = cell(size(corrscore));
     for iid=1:length(corrscore)
-        sameChan{iid} = bsxfun(@eq,shank{iid}(:),shank{iid+1}(:)');
-        sameUnit{iid} = sameChan{iid} & bsxfun(@eq,unit{iid}(:),unit{iid+1}(:)');
+        sameShank{iid} = bsxfun(@eq,shank{iid}(:),shank{iid+1}(:)');
+        % sameUnit{iid} = sameChan{iid} & bsxfun(@eq,unit{iid}(:),unit{iid+1}(:)');
     end
 
     data = [unroll(corrscore) unroll(wavescore) unroll(autoscore) unroll(basescore)];
@@ -34,17 +34,38 @@ function [survival, score] = computeSurvival(shank, unit, corrscore, wavescore, 
     % The E-step is making a hard assignment which is not exactly right but in
     % the context of this type of data where most labels are specified it makes
     % no difference
-    unrollSameChan = unroll(sameChan);
+    unrollSameShank = unroll(sameShank);
     C = unroll(survival);
     for i=1:10
         [C,~,P] = classify(data, data, C,'quadratic');
         % Only same-channel is possible
-        C = C & unrollSameChan;
+        C = C & unrollSameShank;
     end
 
+    % Debug
+    X = data;
+    labels = C;
+    QDA = fitcdiscr(X, labels, 'DiscrimType','quadratic');
+    dataMean = mean([mean(X(labels,:)); mean(X(~labels,:))]);
+    x(1) = corr;
+    x(2) = wave;
+    
+    y = K + x*L + sum(sum((x'*x).*Q));
+    figure;
+    gscatter(X(:,4),X(:,2),labels) 
+    title('Original Data')
+    hold on
+    K = QDA.Coeffs(1,2).Const;
+    L = QDA.Coeffs(1,2).Linear; 
+    Q = QDA.Coeffs(1,2).Quadratic;
+    f = @(x1,x2) K + L(4)*x1 + L(2)*x2 + Q(4,4)*x1.^2 + (Q(4,2)+Q(2,4))*x1.*x2 + Q(2,2)*x2.^2;
+    h2 = fimplicit(f,[min(X(:,4))-0.1 max(X(:,4))+0.1 min(X(:,2))-0.1 max(X(:,2))+0.1]);
+    h2.Color = 'k';
+    h2.LineWidth = 2;
+    legend off;
     % Identify a threshold for a 1% FP rate
     % MML comment: Do they mean 5% FP rate? See quantile() call below
-    negative = data(~unroll(sameChan),:);
+    negative = data(~unroll(sameShank),:);
     [~,~,Pneg] = classify(negative,data,C,'quadratic');
 
     % MML edit: If classification fails just return
@@ -56,8 +77,10 @@ function [survival, score] = computeSurvival(shank, unit, corrscore, wavescore, 
 
     negative = Pneg(:,2); 
     threshold = quantile(negative,.95);
+    % threshold = quantile(negative,.99);
+
     C = P(:,2)>threshold;
-    C = C & unrollSameChan;
+    C = C & unrollSameShank;
 
     survival = reroll(corrscore, C);
     score = reroll(corrscore, P(:,2));
@@ -66,7 +89,7 @@ function [survival, score] = computeSurvival(shank, unit, corrscore, wavescore, 
     % unit becomes two different units or vice versa.  We need to fix all those 
     % cases.
     for iid=1:length(survival)
-        for iic=shank{iid}(:)'
+        for iic=unique(shank{iid}(:)')
             left = shank{iid}==iic;
             right = shank{iid+1}==iic;
             survival{iid}(left,right) = takeBest(score{iid}(left,right), threshold);
@@ -98,7 +121,7 @@ function survival = takeBest(similarity, thresh)
         P = P(find(score==max(score),1),:);
         survival(pre,post) = survival(P,post);
     else
-        P = perms(post);
+        P = perms(uint8(post));
         score = nan(size(P,1),1);
         for i=1:size(P,1)
             score(i) = sum(sum(sim(survival(pre,P(i,:))), 'omitnan'));

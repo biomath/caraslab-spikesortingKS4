@@ -8,6 +8,7 @@ function caraslab_reformat_ephys_data(input_dir, output_dir, format, data_channe
     %
     %       format:     'synapse':      TDT format
     %                   'oe':           OpenEphys format
+%                       'intan':        Intan format
     %                   'binary':       Binary format
     %                   'oe_binary':    Binary format (only info files)
     %  
@@ -72,8 +73,8 @@ function caraslab_reformat_ephys_data(input_dir, output_dir, format, data_channe
         fprintf('\n No BLOCKS could be found!!\n')
         return
     end
-
-    if strcmp(format, 'synapse')
+    switch format
+        case 'synapse'
         %For each block
         for i = 1:numel(block_names)
             t0 = tic;
@@ -151,52 +152,79 @@ function caraslab_reformat_ephys_data(input_dir, output_dir, format, data_channe
         fprintf('\n\n ##### Finished reformatting and saving data files.\n\n')
 
     %% Intan cases
-    else
-        %For each block
-        for i = 1:numel(block_names)
-            cur_path.name = block_names{i};
-            savedir_path = fullfile(output_dir, block_names{i});
-            data_filename = fullfile(savedir_path, [block_names{i} '.dat']);
-            adc_filename = fullfile(savedir_path, [block_names{i} '_ADC.dat']);
-
-            cur_subdir = dir(fullfile(input_dir, block_names{i}, 'Record Node*'));  % assume 1 recording node
-            recnode_path = fullfile(cur_subdir.folder, cur_subdir.name);
-
-            %Convert tank data to -mat and display elapsed time
-            fprintf('\n======================================================\n')
-            fprintf('Processing ephys data, %s.......\n', cur_path.name)
-
-            % Try to read file. If missing, skip to the next folder
-            mkdir(savedir_path);
-            % In case this folder is still absent
-            mkdir(fullfile(savedir_path, 'CSV files'));
-
-            t0 = tic;
-            % fid_data = fopen(data_filename,'w');
-            % fid_adc = fopen(adc_filename,'w');
-
-            try
-                switch format
-                    case 'oe'
-                        handle_oe_data(recnode_path, savedir_path, data_filename, adc_filename, data_channel_idx, adc_channel_idx, info_only);
-                    case 'binary'
-                        handle_binary_data(recnode_path, savedir_path, data_filename, adc_filename, data_channel_idx, adc_channel_idx, info_only);
+        case 'intan'
+            %For each block
+            for i = 1:numel(block_names)
+                t0 = tic;
+                savedir_path = fullfile(output_dir, block_names{i});
+                data_filename = fullfile(savedir_path, [block_names{i} '.dat']);
+                recnode_path = fullfile(input_dir, block_names{i});
+    
+                mkdir(savedir_path);
+                mkdir(fullfile(savedir_path, 'CSV files'));
+                
+                try
+                    handle_intan_data(recnode_path, savedir_path, data_filename, ...
+                        data_channel_idx, adc_channel_idx, info_only);
+                catch ME
+                    if strcmp(ME.identifier, 'MATLAB:load:couldNotReadFile')
+                        fprintf('\nFile not found\n')
+                        continue
+                    else
+                        fprintf(2, ME.identifier)
+                        fprintf(2, ME.message)
+                        break
+                    end
                 end
-            catch ME
-                if strcmp(ME.identifier, 'MATLAB:load:couldNotReadFile')
-                    fprintf('\nFile not found\n')
-                    continue
-                else
-                    fprintf(2, ME.identifier)
-                    fprintf(2, ME.message)
-                    break
-                end
+    
+                tEnd = toc(t0);
+                fprintf('\n~~~~~~\nFinished in: %d minutes and %f seconds\n~~~~~~\n', floor(tEnd/60),rem(tEnd,60));
             end
 
-            tEnd = toc(t0);
-            fprintf('\n~~~~~~\nFinished in: %d minutes and %f seconds\n~~~~~~\n', floor(tEnd/60),rem(tEnd,60));
-        end
-        fprintf('\n\n ##### Finished reformatting and saving data files.\n\n')
+        otherwise
+            %For each block
+            for i = 1:numel(block_names)
+                cur_path.name = block_names{i};
+                savedir_path = fullfile(output_dir, block_names{i});
+                data_filename = fullfile(savedir_path, [block_names{i} '.dat']);
+                adc_filename = fullfile(savedir_path, [block_names{i} '_ADC.dat']);
+    
+                cur_subdir = dir(fullfile(input_dir, block_names{i}, 'Record Node*'));  % assume 1 recording node
+                recnode_path = fullfile(cur_subdir.folder, cur_subdir.name);
+    
+                %Convert tank data to -mat and display elapsed time
+                fprintf('\n======================================================\n')
+                fprintf('Processing ephys data, %s.......\n', cur_path.name)
+    
+                mkdir(savedir_path);
+                mkdir(fullfile(savedir_path, 'CSV files'));
+    
+                t0 = tic;
+                % fid_data = fopen(data_filename,'w');
+                % fid_adc = fopen(adc_filename,'w');
+    
+                try
+                    switch format
+                        case 'oe'
+                            handle_oe_data(recnode_path, savedir_path, data_filename, adc_filename, data_channel_idx, adc_channel_idx, info_only);
+                        case 'binary'
+                            handle_binary_data(recnode_path, savedir_path, data_filename, adc_filename, data_channel_idx, adc_channel_idx, info_only);
+                    end
+                catch ME
+                    if strcmp(ME.identifier, 'MATLAB:load:couldNotReadFile')
+                        fprintf('\nFile not found\n')
+                        continue
+                    else
+                        fprintf(2, ME.identifier)
+                        fprintf(2, ME.message)
+                        break
+                    end
+                end
+    
+                tEnd = toc(t0);
+                fprintf('\n~~~~~~\nFinished in: %d minutes and %f seconds\n~~~~~~\n', floor(tEnd/60),rem(tEnd,60));
+            end
+            fprintf('\n\n ##### Finished reformatting and saving data files.\n\n')
     end
 
     % %% Helpers to handle appropriate Intan formats

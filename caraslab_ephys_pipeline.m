@@ -34,7 +34,8 @@ clear; clc;
 
 %       file_format:            'synapse':      TDT format
 %                               'oe':           OpenEphys format
-%                               'binary':       Binary format
+%                               'intan':        Intan format
+%                               'binary':       Binary open ephys format
 %                               'oe_info':      OpenEphys format (only info files)
 %                               'oe_binary':    Binary format (only info files)
 

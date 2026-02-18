@@ -1,4 +1,4 @@
-function fraser_unit_tracker_wrapper(Savedir, show_plots, bp_filter, load_previous_gwfparams, chanMap)
+function fraser_unit_tracker_wrapper(root_path, show_plots, bp_filter, load_previous_gwfparams, chanMap)
     % This function implements an algorithm to detect unit survival across
     % recording days from Fraser et al., 2011: unitIdentification.m
     %
@@ -39,7 +39,7 @@ function fraser_unit_tracker_wrapper(Savedir, show_plots, bp_filter, load_previo
     
     close all;
     %Prompt user to select folder
-    datafolders_names = uigetfile_n_dir(Savedir,'Select data directory');
+    datafolders_names = uigetfile_n_dir(root_path,'Select data directory');
     datafolders = {};
     for i=1:length(datafolders_names)
         [~, datafolders{end+1}, ~] = fileparts(datafolders_names{i});
@@ -98,28 +98,46 @@ function fraser_unit_tracker_wrapper(Savedir, show_plots, bp_filter, load_previo
     shank_channelses = {};
     % Cycle through folders
     for day_idx=1:length(unique_days)
-               
-        day_dir = fullfile(Savedir, datafolders{day_idx});
+        cur_path.name = datafolders{day_idx};
+        cur_bin_path = fullfile(root_path, cur_path.name);
+        cur_ks_path = fullfile(cur_bin_path, 'kilosort4');
+        cur_wfinfo_path = fullfile(cur_ks_path, 'Waveforms info');
         
+        % Load first day ops for some metadata
+        if day_idx == 1
+            try
+                load(fullfile(cur_bin_path, 'config.mat'));
+            catch ME
+                if strcmp(ME.identifier, 'MATLAB:load:couldNotReadFile')
+                    fprintf('\nFile not found\n')
+                    continue
+                else
+                    fprintf(ME.identifier)  % file not found has no identifier?? C'mon MatLab...
+                    fprintf(ME.message)
+                    continue  % Continue here instead of break because I don't know how to catch 'file not found' exception; maybe using ME.message?
+                end
+            end
+        end
+
         % Load waveforms if gwfparams cannot be found in folder or if
         % load_previous_gwfparams flag is 0
         if load_previous_gwfparams
-            [wf, gwfparams] = try_load_previous_gwfparams(day_dir, bp_filter, 1);
+            [wf, gwfparams] = try_load_previous_gwfparams(cur_bin_path, bp_filter);
         else
             fprintf('Running wf extraction...\n')
-            [wf, gwfparams] = get_waveforms_from_folder(day_dir, bp_filter, 1);
+            [wf, gwfparams] = get_waveforms_from_folder(cur_bin_path, bp_filter);
             % Save gwfparams and wf for future use
             fprintf('Saving gwfparams and wf structs to mat file\n')
             save(fullfile(day_dir, 'extracted_wfs.mat'), 'gwfparams', 'wf', '-v7.3');
         end
         
-        %  To get unit ids
-        split_dir = split(day_dir, filesep); 
-        subj_id = split(split_dir{end-1}, '-');
-        subj_id = join(subj_id(1:3), '-'); 
-        subj_id = subj_id{1}; 
+        % Grab subject name from ePsych metadata
+        subj_id = ops.epsych_metadata{1}.Name;  
+
+        split_dir = split(cur_bin_path, filesep); 
+
         recording_id = split_dir{end};
-        prename = [subj_id '_' recording_id];  % this is what goes into the .txt file name
+        prename = strcat(subj_id, '_', recording_id);  % this is what goes into the .txt file name
         
         day_shanks = [];
         day_units = [];
@@ -128,12 +146,12 @@ function fraser_unit_tracker_wrapper(Savedir, show_plots, bp_filter, load_previo
         day_wfmeans = {};
         day_wfs = {};
         day_gwfparams = {};
+
         day_allShankChan_wfmeans = {};
         day_shank_channels = {};
         for wf_idx=1:length(wf.unitIDs)
-            cur_wfs = wf.waveForms(wf_idx, :, :,:);
             % Normalize wfs around 0 and so that peak is at -1 or 1
-            [day_cur_wfs, day_cur_wf_mean, day_shank, allShankChan_wfmean, shank_channels, ] = normalize_wfs(wf, gwfparams, wf_idx);
+            [day_cur_wfs, day_cur_wf_mean, day_shank, allShankChan_wfmean, shank_channels] = normalize_wfs(wf, gwfparams, wf_idx);
             day_wfs{end+1} = day_cur_wfs;
             day_shanks(end+1) = day_shank;
             day_units(end+1) = wf_idx;
@@ -171,8 +189,8 @@ function fraser_unit_tracker_wrapper(Savedir, show_plots, bp_filter, load_previo
     
     %% Continue to saving and plotting
     % Save variables
-    mkdir(fullfile(Savedir, 'Unit tracking'));
-    save(fullfile(Savedir, 'Unit tracking', 'unitTracking_output.mat'), 'survival', ...
+    mkdir(fullfile(root_path, 'Unit tracking'));
+    save(fullfile(root_path, 'Unit tracking', 'unitTracking_output.mat'), 'survival', ...
         'score', 'corrscore', 'wavescore',  'autoscore', 'basescore', 'correlations', '-v7.3');
     
     % Save plots
@@ -180,7 +198,7 @@ function fraser_unit_tracker_wrapper(Savedir, show_plots, bp_filter, load_previo
     origSize = get(gcf, 'Position'); % grab original on screen size
     set(gcf, 'Position', [0 0 screen_size(3) screen_size(4)] ); %set to scren size
     set(gcf,'PaperPositionMode','auto') %set paper pos for printing
-    print(fullfile(Savedir, 'Unit tracking', 'classifier_plots.pdf'), '-dpdf', '-bestfit', '-painters');
+    print(fullfile(root_path, 'Unit tracking', 'classifier_plots.pdf'), '-dpdf', '-bestfit', '-painters');
     
     % Output a survival csv with new unit IDs
     % Create unique IDs then change them when unit survives
@@ -229,7 +247,7 @@ function fraser_unit_tracker_wrapper(Savedir, show_plots, bp_filter, load_previo
     end
     
     % create a table with unit names and IDs
-    writetable(TT, fullfile(Savedir, 'Unit tracking', [subj_id '_unitSurvival.csv']));        
+    writetable(TT, fullfile(root_path, 'Unit tracking', [subj_id '_unitSurvival.csv']));        
     
     % Plot waveforms overlain; probe geometry is respected
     unique_IDs = unique(TT.Survival_ID);
@@ -281,9 +299,6 @@ function fraser_unit_tracker_wrapper(Savedir, show_plots, bp_filter, load_previo
                         newXSamplePoints = linspace(1, length(cur_wf_mean), length(cur_wf_mean) * samplingRateIncrease);
                         cur_wf_mean_upsample = spline(1:length(cur_wf_mean), cur_wf_mean, newXSamplePoints) * amplitude_gain;
 
-                        x_time = linspace(0, length(cur_wf_mean) / gwfparams.sr, length(cur_wf_mean));
-                        x_time = x_time * 1000; % in ms
-
                         upsampled_x_time = linspace(0, length(cur_wf_mean_upsample) / gwfparams.sr / samplingRateIncrease, length(cur_wf_mean_upsample));
                         upsampled_x_time = upsampled_x_time*1000;
 
@@ -301,7 +316,7 @@ function fraser_unit_tracker_wrapper(Savedir, show_plots, bp_filter, load_previo
             screen_size = get(0, 'ScreenSize');
             set(gcf, 'Position', [0 0 screen_size(3) screen_size(4)] ); %set to scren size
             set(gcf,'PaperPositionMode','auto') %set paper pos for printing
-            print(fullfile(Savedir, 'Unit tracking', ...
+            print(fullfile(root_path, 'Unit tracking', ...
                 ['survival_wfs_' TT(TT.Survival_ID == cur_ID,:).Cluster{1} '_ID' ...
                 int2str(surviving_indices(surviving_indices_iid))]), '-dpdf', '-bestfit', '-painters');
         end

@@ -126,6 +126,7 @@ for day_idx=1:length(unique_days)
     tranges = [];
     cumulative_tranges =[];
     badchannels = [];
+    recording_files_present = 1;  % Flag to check if recording files are present in folder or only Info
     t0 = tic;
     for i = 1:numel(cur_day_datafolders)
         cur_path_name = cur_day_datafolders{i};
@@ -153,31 +154,38 @@ for day_idx=1:length(unique_days)
             end
         end
 
+        recording_file = dir(ops.fclean);
+        if isempty(recording_file)
+            recording_files_present = 0;
+        end
+
         NchanTOT = ops.NchanTOT;
         NT = ops.NT;
         badchannels = [badchannels ops.badchannels];
 
-        fprintf('\tReading raw file: %s\n', ops.fclean)
-        fid = fopen(ops.fclean, 'r'); % open current raw data
+        % session_names{end+1} = dir(ops.fclean).name;  % Won't work when info_only == 1
+        fclean_split_path = split(ops.fclean, filesep);
+        session_names{end+1} = fclean_split_path{end};
 
-        session_names{end+1} = dir(ops.fclean).name;
-
-        if i > 1
-            previous_breakpoint = break_points(i-1);
-        else
-            previous_breakpoint = 0;
+        if recording_files_present
+            if i > 1
+                previous_breakpoint = break_points(i-1);
+            else
+                previous_breakpoint = 0;
+            end
+    
+		    cur_break_point = get_file_size(ops.fclean)/NchanTOT/2 + previous_breakpoint;
+    
+            break_points = [break_points; cur_break_point];
+		    break_points_seconds = [break_points_seconds; cur_break_point/ops.fs];
+            % create offset variables relevant to the concatenation process
+            tranges = [tranges; ops.trange];
+            cumulative_tranges = [cumulative_tranges; ops.trange + (previous_breakpoint / ops.fs)];
         end
-
-		cur_break_point = get_file_size(ops.fclean)/NchanTOT/2 + previous_breakpoint;
-
-        break_points = [break_points; cur_break_point];
-		break_points_seconds = [break_points_seconds; cur_break_point/ops.fs];
-
-        % create offset variables relevant to the concatenation process
-        tranges = [tranges; ops.trange];
-        cumulative_tranges = [cumulative_tranges; ops.trange + (previous_breakpoint / ops.fs)];
-%         
+                
         if ~info_only
+            fprintf('\tReading raw file: %s\n', ops.fclean)
+            fid = fopen(ops.fclean, 'r'); % open current raw data
             while ~feof(fid)  % read until end of file
                 buff = fread(fid, [NchanTOT NT], '*int16'); % read and reshape. Assumes int16 data (which should perhaps change to an option)
                 fwrite(fidC, buff(:), 'int16'); % write this batch to concatenated file
@@ -216,40 +224,29 @@ for day_idx=1:length(unique_days)
         end
     end
     
-    %% Output csv breakpoints
-    
-    % DEPRECATED: Grab subject name; this is specific for my naming convention; 
-    % Should be tweaked if yours is different
-    % cur_path_name = cur_day_datafolders{1};
-    % cur_path = fullfile(root_path, cur_path_name);
-    % split_dir = split(cur_path, filesep); 
-    % 
-    % subj_id = split(split_dir{end-1}, '-');
-    % subj_id = join(subj_id(1:3), '-'); 
-    % subj_id = subj_id{1}; 
-
-    % Grab subject name from ePsych metadata
-    subj_id = cur_metadata.Name;  % "Leftover" metadata from date sorting loop
-
-    ret_table = cell2table(session_names', 'VariableNames', {'Session_file'});
-    ret_table.Break_point = break_points;
-	ret_table.Break_point_seconds = break_points_seconds;
-    writetable(ret_table, fullfile(full_output_dir, 'Info files', strcat(subj_id, '_', output_file_name, '_breakpoints.csv')));
-    
-    %% Close file and save Config
+    %% Finish up and save info
     if ~info_only
         fclose(fidC);
     end
-
-    % Create new config.mat
-    caraslab_createconfig(root_path,chanMap, unique(badchannels), 0, recording_type, full_output_dir)
-    load(fullfile(full_output_dir, 'config.mat'));
-    ops.concat_tranges = tranges;
-    ops.concat_cumulative_tranges = cumulative_tranges;
     
-    save(fullfile(full_output_dir, 'config.mat'), 'ops');
-
+    if recording_files_present
+        % Grab subject name from ePsych metadata
+        subj_id = cur_metadata.Name;  % "Leftover" metadata from date sorting loop
     
+        ret_table = cell2table(session_names', 'VariableNames', {'Session_file'});
+        ret_table.Break_point = break_points;
+	    ret_table.Break_point_seconds = break_points_seconds;
+        writetable(ret_table, fullfile(full_output_dir, 'Info files', strcat(subj_id, '_', output_file_name, '_breakpoints.csv')));
+        
+    
+        % Create new config.mat
+        caraslab_createconfig(root_path,chanMap, unique(badchannels), 0, recording_type, full_output_dir)
+        load(fullfile(full_output_dir, 'config.mat'));
+        ops.concat_tranges = tranges;
+        ops.concat_cumulative_tranges = cumulative_tranges;
+        
+        save(fullfile(full_output_dir, 'config.mat'), 'ops');
+    end
     
     tEnd = toc(t0);
     fprintf('Done in: %d minutes and %f seconds\n', floor(tEnd/60), rem(tEnd,60));

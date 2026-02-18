@@ -166,10 +166,12 @@ function handle_oe_data(recnode_path, savedir_path, data_filename, ...
         if strcmp(ME.identifier, 'MATLAB:FileIO:InvalidFid')
             % OpenEphys v1.0+
             event_file_dir = dir(fullfile(recnode_path, '*RhythmData.events'));
-            
-             [events.sampleNumber, events.processorId, events.state, events.channel, events.header ] = ...
-                loadEventsFile(fullfile(recnode_path, event_file_dir.name), 1);
-            
+            % Load only a little bit of a channel file to get the zero timestamp info
+            [~, data_timestamps, ~, ~] = load_open_ephys_data_chunked(fullfile(recnode_path, data_channels{1}), 0, 5, 'samples');
+    
+            [events.sampleNumber, events.processorId, events.state, events.channel, events.header ] = ...
+                    loadEventsFile(fullfile(recnode_path, event_file_dir.name), 1);
+
             % Convoluted way to get the sampling rate
             info = readstruct(fullfile(recnode_path, 'settings.xml'), "FileType", "xml");
             sampling_rate = info.SIGNALCHAIN.PROCESSOR(1).STREAM.sample_rateAttribute;
@@ -181,7 +183,7 @@ function handle_oe_data(recnode_path, savedir_path, data_filename, ...
             epData.event_ids = events.channel + 1; % convert to 1-base index
             epData.event_states = events.state;
         
-            epData.timestamps = double(events.sampleNumber)/sampling_rate;
+            epData.timestamps = double(events.sampleNumber)/sampling_rate - data_timestamps(1);  % Subtract the starting sample
             epData.info.blockname = cur_path;
         
             % Grab date and timestamp from info

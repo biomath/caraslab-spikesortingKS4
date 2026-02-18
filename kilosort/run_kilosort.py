@@ -287,11 +287,8 @@ def _sort(filename, results_dir, probe, settings, data_dtype, device, do_CAR,
                 gui_sorter.st0 = st0
                 gui_sorter.plotDataReady.emit('drift')
             else:
-                # MML: MatLab crashes when matplotlib.pyplot is called for some reason.
-                # Something to do with Anaconda python?
-                pass  
-                # kplots.plot_drift_amount(ops, results_dir)
-                # kplots.plot_drift_scatter(st0, results_dir)
+                kplots.plot_drift_amount(ops, results_dir)
+                kplots.plot_drift_scatter(st0, results_dir)
 
         # Sort spikes and save results
         st,tF, Wall0, clu0 = detect_spikes(
@@ -310,6 +307,7 @@ def _sort(filename, results_dir, probe, settings, data_dtype, device, do_CAR,
             # Something to do with Anaconda python?
             pass  
             # kplots.plot_diagnostics(Wall0, clu0, ops, results_dir)
+
         clu, Wall, st, tF = cluster_spikes(
             st, tF, ops, device, bfile, tic0=tic0, progress_bar=progress_bar,
             clear_cache=clear_cache, verbose=verbose_log,
@@ -323,6 +321,7 @@ def _sort(filename, results_dir, probe, settings, data_dtype, device, do_CAR,
                 )
         if torch.cuda.is_available():
             ops['cuda_postproc'] = torch.cuda.memory_stats(device)
+
         logger.info('Generating spike position plot ...')
         if gui_sorter is not None:
             gui_sorter.clu = clu[kept_spikes]
@@ -335,6 +334,7 @@ def _sort(filename, results_dir, probe, settings, data_dtype, device, do_CAR,
             # kplots.plot_spike_positions(clu[kept_spikes], is_ref, results_dir)
         logger.info('Sorting finished.')
         log_sorting_summary(ops, log=logger, level='info')
+        
     except Exception as e:
         if isinstance(e, torch.cuda.OutOfMemoryError):
             logger.exception('Out of memory error, printing performance...')
@@ -350,7 +350,7 @@ def _sort(filename, results_dir, probe, settings, data_dtype, device, do_CAR,
     finally:
         close_logger()
 
-    logger.info('Debug point 6: CLEAR')
+
     return ops, st, clu, tF, Wall, similar_templates, \
            is_ref, est_contam_rate, kept_spikes
 
@@ -520,7 +520,7 @@ def initialize_ops(settings, probe, data_dtype, do_CAR, invert_sign,
 
 
     # TODO: Clean this up during refactor. Lots of confusing duplication here.
-    ops = settings  
+    ops = settings.copy()
     ops['settings'] = settings
     ops['probe'] = probe
     ops['data_dtype'] = data_dtype

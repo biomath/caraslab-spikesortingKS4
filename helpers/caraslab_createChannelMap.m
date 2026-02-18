@@ -12,11 +12,12 @@ function caraslab_createChannelMap(savedir,probetype, recording_format)
 %               'NN4x16Poly64':     Neuronexus A4x16 Poly2 H64LP (only for Synapse)
 %               'NNA4x16Lin64':     Neuronexus A4x16 Poly2 Linear H64LP
 %               'NNA2x32':          Neuronexus A2x32-5mm-25-200-177 (only for Synapse)
-%               'NNoptrodeLin4':    Neuronexus Qtrode-Linear
+%               'NNoptrodeLin4':    Neuronexus Qtrode-Linear (only for Intan)
+%               'NNA1x16':          Neuronexus A1x16-Linear (only for Intan)
 
 %
 % Kilosort2 note: kcoords is used to forcefully restrict templates to channels in the same
-% channel group. An option can be set in the master_file to allow a fraction 
+% channel group. An option can be NNA4x16Lin64set in the master_file to allow a fraction 
 % of all templates to span more channel groups, so that they can capture shared 
 % noise across all channels. This option is ops.criterionNoiseChannels = 0.2; 
 % If this number is less than 1, it will be treated as a fraction of the total number of clusters
@@ -31,9 +32,11 @@ function caraslab_createChannelMap(savedir,probetype, recording_format)
 switch probetype
     case {'NNBuz5x1264','NN4x16Poly64','NNA4x16Lin64', 'NNA2x32'}
         Nchannels = 64;
-
+    case {'NNA1x16'}
+        Nchannels = 16;
     case {'NNoptrodeLin4', 'NNoptrodeTet4'}
         Nchannels = 4;
+
 end
 
 
@@ -491,7 +494,32 @@ switch probetype
             % Tip of the probe is 0
             ycoords_map = {[155.6, 120, 137.8, 137.8]};
         
+    case 'NNA1x16'
+        switch recording_format
+            case 'synapse'
+                fprintf('This probe type has not been set up yet for the TDT system')
+            case 'intan'
+                % From top of shank to bottom
+                shank_chs = [7 10 2 15 3 14 4 13 1 16 5 12 6 11 8 9];
+        end
+            % This will be used below to set kcoords appropriately
+            % Channels are 100 um apart so it doesn't make sense to sort
+            % them together, maybe?
+            kcoords_map = num2cell(shank_chs);
 
+
+            %-----------------------------------------------------------------------
+            %Define the x coordinates for each channel group (in relative microns)
+            %-----------------------------------------------------------------------
+            xcoords_map = num2cell(zeros(size(shank_chs)));
+
+
+            %-----------------------------------------------------------------------
+            %Define the y coordinates for each channel group (in relative microns)
+            %-----------------------------------------------------------------------
+            ycoords_chs = 1500:-100:0;  % top to bottom
+            ycoords_map = num2cell(ycoords_chs);
+            
     otherwise
         fprintf('\nProbe dimensions not specified!\nEdit caraslab_CreateChannelMapFile.m to add dimensions before map can be generated.\n')
         return

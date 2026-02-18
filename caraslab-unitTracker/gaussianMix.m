@@ -27,8 +27,8 @@ negative = data(~sameChan,:);
 [~,~,P] = classify(negative,data,survival,'quadratic');
 
 negative = P(:,2);
-% threshold = quantile(negative,.95);
 threshold = quantile(negative,.95);
+% threshold = quantile(negative,.99);
 % threshold = .5;
 fprintf('Threshold = %0.3f\n',threshold);
 

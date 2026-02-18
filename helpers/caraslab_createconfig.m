@@ -143,10 +143,16 @@ for i = 1:numel(datafolders)
     ops.comb = 1;  % Comb filter before highpass (0)
 
     ops.ntbuff = floor(0.002 * ops.fs);
+    % ops.ntbuff = 60;
     
-    ops.rm_artifacts = 1;  % Remove super high amplitude events
+    ops.rm_artifacts = 1;  % Remove super high amplitude voltage
     ops.std_threshold = 65;  % Threshold for artifact rejection (65)
     
+    % After kilosort, delete templates with amplitudes above an arbitrary threshold
+    % I don't see anything above 50 that looks like a spike, but change
+    % this accordingly by inspecting the amplitude view in Phy
+    ops.noise_removal_cutoff = 50;
+
     ops.Nchan = ops.NchanTOT - numel(badchannels);              %number of active channels
     
     % Number of samples included in each batch of data.
@@ -155,7 +161,7 @@ for i = 1:numel(datafolders)
     % sampling rate of 30000. For probes with fewer channels (say, 64 or less), 
     % increasing batch_size to include more data may improve results because it 
     % allows for better drift estimation (more spikes to estimate drift from).
-    ops.NT = round(ops.fs * 5);
+    ops.NT = round(ops.fs * 4);
 
     ops.fbinary = fullfile(cur_savedir, strcat(cur_path.name, '.dat'));
     ops.fclean = fullfile(cur_savedir, strcat(cur_path.name, '_CLEAN.dat'));
@@ -205,7 +211,7 @@ for i = 1:numel(datafolders)
     % reduce Th_universal. Try reducing each threshold by 1 or 2 at a time.
     
     % Spike detection threshold for universal templates.
-    ops.ksparams.Th_universal = 8;  % (9)
+    ops.ksparams.Th_universal = 10;  % (9)
     
     % Spike detection threshold for learned templates.
     ops.ksparams.Th_learned = 9;  % (8)

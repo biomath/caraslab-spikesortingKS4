@@ -71,7 +71,7 @@ for i = 1:numel(datafolders)
 
     
 %     NT       = ops.NT ; % number of timepoints per batch
-    NT = floor(5*ops.fs);  % Can be significantly higher than kilosort's here, but lower it if running out of RAM
+    NT = floor(25*ops.fs);  % Can be significantly higher than kilosort's here, but lower it if running out of RAM
 
     bytes       = get_file_size(ops.fbinary); % size in bytes of raw binary
 
@@ -101,6 +101,9 @@ for i = 1:numel(datafolders)
         comb_b1= comb_filter.Numerator;
         comb_a1= comb_filter.Denominator;
     end
+    
+    % Reset gpu
+    reset(gpuDevice());
 
     %Start timer
     t0 = tic;
@@ -207,7 +210,7 @@ for i = 1:numel(datafolders)
             % MML edit: this part is weird in the original kilosort2 code so I
             % rewrote it in a way it makes sense to me. I described the issue
             % in the link below, and Marius (Kilosort developer) didn't 
-            % necessary think it was a bug, but my confusion remains. 
+            % necessarily think it was a bug, but my confusion remains. 
             % https://github.com/MouseLand/Kilosort/issues/223
             
             offset = max(0, ops.twind + 2*NchanTOT*(NT*(ibatch-1) - 2*ops.ntbuff)); % number of samples to start reading at.

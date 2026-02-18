@@ -1,5 +1,6 @@
-function [spike_times, spike_clusters, spike_templates, amplitudes, pc_features] = ...
-        remove_spikes(spike_times, spike_clusters, spike_templates, amplitudes, pc_features, spikes_to_remove)
+function [spike_times, spike_clusters, spike_templates, amplitudes, pc_features, kept_spikes] = ...
+        remove_spikes(spike_times, spike_clusters, spike_templates, ...
+        amplitudes, pc_features, spikes_to_remove, kept_spikes)
 % 
 %         """
 %         Removes spikes from Kilosort outputs
@@ -16,6 +17,8 @@ function [spike_times, spike_clusters, spike_templates, amplitudes, pc_features]
 %             Amplitude value for each spike time
 %         pc_features : numpy.ndarray (num_spikes x num_pcs x num_channels)
 %             Pre-computed PCs for blocks of channels around each spike
+%         kept_spikes: numpy.ndarray (num_spikes x num_pcs x num_channels)
+%             Boolean designating which spikes are kept
 %         spikes_to_remove : numpy.ndarray
 %             Indices of spikes to remove
 % 
@@ -26,12 +29,13 @@ function [spike_times, spike_clusters, spike_templates, amplitudes, pc_features]
 %         spike_templates : numpy.ndarray (num_spikes - spikes_to_remove x 0)
 %         amplitudes : numpy.ndarray (num_spikes - spikes_to_remove x 0)
 %         pc_features : numpy.ndarray (num_spikes - spikes_to_remove x num_pcs x num_channels)
-% 
+%         kept_spikes : numpy.ndarray (num_spikes - spikes_to_remove x 0)
 %         """
         spike_times(spikes_to_remove) = [];
         spike_clusters(spikes_to_remove) = [];
         spike_templates(spikes_to_remove) = [];
         amplitudes(spikes_to_remove) = [];
         pc_features(spikes_to_remove, :, :) = [];
+        kept_spikes(spikes_to_remove) = [];
      
     end
