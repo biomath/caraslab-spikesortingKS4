@@ -10,6 +10,7 @@ TODO: Try to install Kilosort using a base python distribution
 
 Required before running for the first time:
 - npy-matlab (https://github.com/kwikteam/npy-matlab)
+- open-ephys-matlab-tools (https://github.com/open-ephys/open-ephys-matlab-tools.git)
 - Kilosort4 v4.1.3: install Kilosort4 according to the developers' [instructions](https://github.com/MouseLand/Kilosort). Note: v4.1.3 is required.
 - Reinstalling torch within the kilosort environment seems to be a requirement for this to work.
   
