@@ -23,13 +23,13 @@ Required before running for the first time:
 6. Install phy acording to developers' [instructions](https://github.com/cortex-lab/phy)
    - Note: I prefer the phy2 development version:
       ```
-      git clone git@github.com:cortex-lab/phy.git
+      git clone https://github.com/cortex-lab/phy.git
       cd phy
       pip install -r requirements.txt
       pip install -r requirements-dev.txt
       pip install -e .
       cd ..
-      git clone git@github.com:cortex-lab/phylib.git
+      git clone https://github.com/cortex-lab/phylib.git
       cd phylib
       pip install -e . --upgrade
       ```
