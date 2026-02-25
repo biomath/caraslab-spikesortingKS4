@@ -18,7 +18,7 @@ Required before running for the first time:
         pip uninstall torch
         pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
 
-5. Copy the modified run_kilosort.py file into your conda path (e.g., /home/user/miniconda3/envs/kilosort/lib/python3.11/site-packages/kilosort)
+5. Copy the modified /kilosort/run_kilosort.py file from this repository into your conda kilosort folder and replace the original (e.g., /home/user/miniconda3/envs/kilosort/lib/python3.11/site-packages/kilosort)
 
 6. Install phy acording to developers' [instructions](https://github.com/cortex-lab/phy)
    - Note: I prefer the phy2 development version:
