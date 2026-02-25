@@ -9,11 +9,12 @@ Modified run_kilosort.py: Needed to comment out a couple of plotting functions b
 TODO: Try to install Kilosort using a base python distribution
 
 Required before running for the first time:
-- npy-matlab (https://github.com/kwikteam/npy-matlab)
-- Kilosort4 v4.0.37: install Kilosort4 according to the developers' instructions (https://github.com/MouseLand/Kilosort/releases/tag/v4.0.37).
-- Reinstalling torch within the kilosort environment seems to be a requirement for this to work.
+1. npy-matlab (https://github.com/kwikteam/npy-matlab)
+2. Kilosort4 v4.0.37: install Kilosort4 according to the developers' instructions (steps 1-6) (https://github.com/MouseLand/Kilosort/releases/tag/v4.0.37).
+   - Instead of steps 7-8 in the kilosort installation instructions, see below
+4. Reinstalling torch within the kilosort environment seems to be a requirement for this to work.
   
         pip uninstall torch
         pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
 
-- Copy the modified run_kilosort.py file into your conda path (e.g., /home/user/miniconda3/envs/kilosort/lib/python3.9/site-packages/kilosort)
+5. Copy the modified run_kilosort.py file into your conda path (e.g., /home/user/miniconda3/envs/kilosort/lib/python3.9/site-packages/kilosort)
