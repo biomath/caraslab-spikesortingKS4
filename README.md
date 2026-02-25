@@ -9,8 +9,8 @@ Modified run_kilosort.py: Needed to comment out a couple of plotting functions b
 TODO: Try to install Kilosort using a base python distribution
 
 Required before running for the first time:
-1. [npy-matlab](https://github.com/kwikteam/npy-matlab)
-2. [open-ephys-matlab-tools](https://github.com/open-ephys/open-ephys-matlab-tools.git)
+1. Install [npy-matlab](https://github.com/kwikteam/npy-matlab) and add to MatLab path
+2. Install [open-ephys-matlab-tools](https://github.com/open-ephys/open-ephys-matlab-tools.git) and add to MatLab path
 3. Kilosort4 v4.1.3: install Kilosort4 according to the developers' [instructions](https://github.com/MouseLand/Kilosort). Note: v4.1.3 is required.
    - Instead of steps 7-8 in the kilosort installation instructions, see below
 4. Reinstalling torch within the kilosort environment seems to be a requirement for this to work.
