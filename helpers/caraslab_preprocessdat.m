@@ -168,7 +168,7 @@ for i = 1:numel(datafolders)
             datr = filter(b1, a1, datr); % causal forward filter again
             datr = flipud(datr); % reverse time back
 
-            datr    = datr(ioffset + (1:NT),:); % remove timepoints used as buffers
+            datr    = datr(ioffset + (1:nsampcurr),:); % remove timepoints used as buffers
 
             if getOr(ops, 'rm_artifacts', 1)
     %             inspect_results = 1;
