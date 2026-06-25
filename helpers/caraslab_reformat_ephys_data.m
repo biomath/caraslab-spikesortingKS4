@@ -1,4 +1,4 @@
-function caraslab_reformat_ephys_data(input_dir, output_dir, format, data_channel_idx, adc_channel_idx, info_only)
+function caraslab_reformat_ephys_data(input_dir, output_dir, format, data_channel_idx, adc_channel_idx, info_only, ChannelDisabled)
     %   Function to reformat and save ephys data from TDT Synapse or OpenEphys GUI.
     %
     %   Input variables:
@@ -165,18 +165,35 @@ function caraslab_reformat_ephys_data(input_dir, output_dir, format, data_channe
                 
                 try
                     handle_intan_data(recnode_path, savedir_path, data_filename, ...
-                        data_channel_idx, adc_channel_idx, info_only);
+                        data_channel_idx, adc_channel_idx, info_only,ChannelDisabled);
+                % catch ME
+                %     if strcmp(ME.identifier, 'MATLAB:load:couldNotReadFile')
+                %         fprintf('\nFile not found\n')
+                %         continue
+                %     else
+                %         fprintf(2, ME.identifier)
+                %         fprintf(2, ME.message)
+                %         break
+                %     end
+                % end
                 catch ME
-                    if strcmp(ME.identifier, 'MATLAB:load:couldNotReadFile')
-                        fprintf('\nFile not found\n')
-                        continue
-                    else
-                        fprintf(2, ME.identifier)
-                        fprintf(2, ME.message)
-                        break
+            
+                if strcmp(ME.identifier, 'MATLAB:load:couldNotReadFile')
+                    fprintf('\nFile not found\n')
+                    continue
+                else
+                    fprintf(2, '\nERROR ID: %s\n', ME.identifier)
+                    fprintf(2, 'ERROR MESSAGE: %s\n\n', ME.message)
+            
+                    for k = 1:length(ME.stack)
+                        fprintf(2, 'File: %s\n', ME.stack(k).file)
+                        fprintf(2, 'Function: %s\n', ME.stack(k).name)
+                        fprintf(2, 'Line: %d\n\n', ME.stack(k).line)
                     end
+            
+                    rethrow(ME)
                 end
-    
+            end
                 tEnd = toc(t0);
                 fprintf('\n~~~~~~\nFinished in: %d minutes and %f seconds\n~~~~~~\n', floor(tEnd/60),rem(tEnd,60));
             end
