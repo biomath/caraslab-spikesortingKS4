@@ -71,7 +71,8 @@ for i = 1:numel(datafolders)
 
     
 %     NT       = ops.NT ; % number of timepoints per batch
-    NT = floor(25*ops.fs);  % Can be significantly higher than kilosort's here, but lower it if running out of RAM
+    % NT = floor(15*ops.fs);  % Can be significantly higher than kilosort's here, but lower it if running out of RAM
+    NT = floor(5*ops.fs);  % Can be significantly higher than kilosort's here, but lower it if running out of RAM
 
     bytes       = get_file_size(ops.fbinary); % size in bytes of raw binary
 
@@ -168,11 +169,7 @@ for i = 1:numel(datafolders)
             datr = filter(b1, a1, datr); % causal forward filter again
             datr = flipud(datr); % reverse time back
 
-            if nsampcurr<NTbuff  % Last batch special case
-                datr    = datr(ioffset + (1:nsampcurr),:); % remove timepoints used as buffers
-            else
-                datr    = datr(ioffset + (1:NT),:); % remove timepoints used as buffers
-            end
+            datr    = datr(ioffset + (1:NT),:); % remove timepoints used as buffers
 
             if getOr(ops, 'rm_artifacts', 1)
     %             inspect_results = 1;
@@ -266,7 +263,11 @@ for i = 1:numel(datafolders)
                 datr = flipud(datr); % reverse time back
             end
             
-            datr    = datr(ioffset + (1:NT),:); % remove timepoints used as buffers
+            if nsampcurr<NTbuff  % Last batch special case
+                datr    = datr(ioffset + (1:nsampcurr),:); % remove timepoints used as buffers
+            else
+                datr    = datr(ioffset + (1:NT),:); % remove timepoints used as buffers
+            end
 
             if getOr(ops, 'rm_artifacts', 1)
                 warning off;
