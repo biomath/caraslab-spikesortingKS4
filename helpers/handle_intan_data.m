@@ -1,12 +1,26 @@
 function handle_intan_data(recnode_path, savedir_path, data_filename, ...
-    data_channel_idx, adc_channel_idx, info_only)
+    data_channel_idx, adc_channel_idx, info_only, ChannelDisabled)
     % Data channels have the naming convention *CHXX.continuous
     % Read recording info to get channel order; ADC channels will also
     % be in the mix; Channels should come out in order
 
     batch_size = 1800000; % Lower this number if running out of memory
 
-    try
+    % try
+    %     data_channels = {};
+    %     for ch = data_channel_idx-1
+    %         % Construct file names (try lowercase and uppercase)
+    %         cur_ch = fullfile(recnode_path, sprintf('amp-A-%03d.dat', ch));            
+    %         % Determine which file exists
+    %         if exist(cur_ch,'file')
+    %             data_channels{end+1} = cur_ch;
+    %         else
+    %             error('Cannot find amplifier file for channel %d in folder %s', ch, recnode_path);
+    %         end
+    %     end
+    % end
+
+ try
         data_channels = {};
         for ch = data_channel_idx-1
             % Construct file names (try lowercase and uppercase)
@@ -14,57 +28,94 @@ function handle_intan_data(recnode_path, savedir_path, data_filename, ...
             % Determine which file exists
             if exist(cur_ch,'file')
                 data_channels{end+1} = cur_ch;
-            else
+            elseif ChannelDisabled == ch
+                data_channels{end+1} = NaN;
+            else 
                 error('Cannot find amplifier file for channel %d in folder %s', ch, recnode_path);
             end
         end
     end
-
+    
     % For file naming purposes
     [~, cur_path] = fileparts(savedir_path);
 
     %% Read data channels and add to a .dat file
     if ~info_only
         fprintf('Processing data channels: %s\n', cur_path)
-        % load one channel just to gauge data size
         fid = fopen(data_channels{1},'r');
         temp_ch = fread(fid, Inf, '*int16');  % read as column vector
+        nsamples = length(temp_ch);
+        clear temp_ch
         fclose(fid);
-        data_size = length(temp_ch);
-        Nbatch = ceil(data_size / batch_size); % number of data batches
-
-        batch_counter = 1;
-        fprintf('\tProcessing %d batches.......\n', Nbatch)
-        lineLength_toUpdate = 0;
         [fid_data, msg] = fopen(data_filename,'w');
-        for ibatch = 1:Nbatch  % Couldn't get the batch stuff to work properly yet,
-            rawsig = zeros(length(data_channels), batch_size, 'int16');  % preallocate
-            for ch_idx=1:length(data_channels)
-                fid = fopen(data_channels{ch_idx}, 'r');
-
-                fseek_offset = 2*(batch_size*(ibatch-1));  % in bytes
-                fseek(fid, fseek_offset, 'bof'); % fseek to batch start in raw file
-                 
-                cur_ch_data = fread(fid, batch_size, '*int16');  
-                fclose(fid);
-
-                rawsig(ch_idx, 1:length(cur_ch_data)) = cur_ch_data';
-
-                nsampcurr = length(cur_ch_data); % how many time samples the current batch has
-                
-                if nsampcurr<batch_size
-                    % trim the trailing zeros from rawsig
-                    rawsig = rawsig(:, 1:length(cur_ch_data));
-                end
+        rawsig = zeros(length(data_channels), nsamples, 'int16');  % preallocate
+        % for ch_idx=1:length(data_channels)
+        %     fprintf('Reading channel: %d\n', ch_idx)
+        %     fid = fopen(data_channels{ch_idx}, 'r');
+        %     cur_ch_data = fread(fid, Inf, '*int16');  
+        %     fclose(fid);
+        %     rawsig(ch_idx, :) = cur_ch_data';
+        % end
+        try
+        for ch_idx=1:length(data_channels)
+            fprintf('Reading channel: %d\n', ch_idx)
+            if ~isnan(data_channels{ch_idx})
+            fid = fopen(data_channels{ch_idx}, 'r');
+            cur_ch_data = fread(fid, Inf, '*int16');  
+            fclose(fid);
+            rawsig(ch_idx, :) = cur_ch_data';
+            elseif ch_idx == (ChannelDisabled+1)
+                % cur_ch_data = NaN(length(rawsig),1);
+                cur_ch_data = zeros(length(rawsig),1);
+                rawsig(ch_idx, :) = cur_ch_data;
+            else 
+                error('Cannot find amplifier file for channel %d in folder %s', ch, recnode_path);
             end
-
-            fwrite(fid_data, rawsig, 'int16');
-           
-            % Update last line in console as a poor-man's progress bar
-            fprintf(repmat('\b',1,lineLength_toUpdate));
-            lineLength_toUpdate = fprintf('\tCompleted %d out %d of batches.......\n', batch_counter, Nbatch);
-            batch_counter = batch_counter + 1;
+        
         end
+        end
+        fwrite(fid_data, rawsig(:), 'int16');
+
+        % load one channel just to gauge data size
+        % 
+        % fid = fopen(data_channels{1},'r');
+        % temp_ch = fread(fid, Inf, '*int16');  % read as column vector
+        % fclose(fid);
+        % data_size = length(temp_ch);
+        % Nbatch = ceil(data_size / batch_size); % number of data batches
+        % 
+        % batch_counter = 1;
+        % fprintf('\tProcessing %d batches.......\n', Nbatch)
+        % lineLength_toUpdate = 0;
+        % [fid_data, msg] = fopen(data_filename,'w');
+        % for ibatch = 1:Nbatch 
+        %     rawsig = zeros(length(data_channels), batch_size, 'int16');  % preallocate
+        %     for ch_idx=1:length(data_channels)
+        %         fid = fopen(data_channels{ch_idx}, 'r');
+        % 
+        %         fseek_offset = 2*(batch_size*(ibatch-1));  % in bytes
+        %         fseek(fid, fseek_offset, 'bof'); % fseek to batch start in raw file
+        % 
+        %         cur_ch_data = fread(fid, batch_size, '*int16');  
+        %         fclose(fid);
+        % 
+        %         rawsig(ch_idx, 1:length(cur_ch_data)) = cur_ch_data';
+        % 
+        %         nsampcurr = length(cur_ch_data); % how many time samples the current batch has
+        % 
+        %         if nsampcurr<batch_size
+        %             % trim the trailing zeros from rawsig
+        %             rawsig = rawsig(:, 1:length(cur_ch_data));
+        %         end
+        %     end
+        % 
+        %     fwrite(fid_data, rawsig, 'int16');
+        % 
+        %     % Update last line in console as a poor-man's progress bar
+        %     fprintf(repmat('\b',1,lineLength_toUpdate));
+        %     lineLength_toUpdate = fprintf('\tCompleted %d out %d of batches.......\n', batch_counter, Nbatch);
+        %     batch_counter = batch_counter + 1;
+        % end
 
         fclose(fid_data);
     
@@ -167,6 +218,53 @@ function handle_intan_data(recnode_path, savedir_path, data_filename, ...
         if length(cur_onsets) ~= length(cur_offsets)
             cur_onsets = cur_onsets(1:end-1);
         end
+
+        % Special Case for SUBJ-ID-1203 Passive_post 6/15 (when INtan TTL
+        % pulse records to consecutvie onsets before offset as last onset
+        % of trial
+        if length(cur_onsets) ~= length(cur_offsets) && ...
+   strcmp(info_file, '/mnt/CL_8TB_4/temp_tank/SUBJ-ID-1203/SUBJ-ID-1203_passivePost_260615_092359/info.rhd')
+            cur_onsets = cur_onsets (1:end-1);
+        end
+
+        % Special Case for when Intan TTL pulse records to consecutive
+        % onsets before an offset (MWM 3/25/26)
+        if length (cur_onsets) ~= length(cur_offsets)
+            temp=cur_onsets(2:length(cur_offsets)+1)-cur_offsets;
+            [row]=find(temp < 0);
+            rowtodelete=row(2);
+            cur_onsets(rowtodelete)=[];
+        end
+
+        % Special Case for when Intan TTL pulse records two consecutive
+        % onsets before an offset 2 times (MWM 6/23/26)(for ID 1203 6/6
+        % active recordng)
+        if length (cur_onsets) ~= length(cur_offsets)
+            temp=cur_onsets(2:length(cur_offsets)+1)-cur_offsets;
+            [row]=find(temp < 0);
+            rowtodelete=row(2);
+            cur_onsets(rowtodelete)=[];
+        end
+
+        % Special Case for when Intan TTL pulse records two consecutive
+        % onsets before an offset a 3rd times (MWM 6/23/26)(for ID 1203 6/6
+        % active recordng)
+        if length (cur_onsets) ~= length(cur_offsets)
+            temp=cur_onsets(2:length(cur_offsets)+1)-cur_offsets;
+            [row]=find(temp < 0);
+            rowtodelete=row(2);
+            cur_onsets(rowtodelete)=[];
+        end
+
+        temp=cur_offsets-cur_onsets;
+           % [row]=find(temp < 0);
+
+        if length (cur_onsets) == length(cur_offsets) && ...
+                any(temp < 0)
+          error('offsets and onsets are not aligned propperly')
+        end
+
+
 
         % Calulate durations
         cur_durations = cur_offsets - cur_onsets;
