@@ -104,14 +104,35 @@ function call_kilosort(cur_savedir, ops, rootH)
     end
     
 
-    % ~~~~~~ RUN KILOSORT ~~~~~~  
-    fprintf('Initializing Kilosort4...\n')
-    py.kilosort.run_kilosort(settings=run_settings, probe=cur_probe, ...
-        filename=py.str(temp_file), bad_channels=int16(ops.badchannels-1), ...
-        save_preprocessed_copy=py.bool(false),...
-        do_CAR=py.bool(~ops.CAR));
-    fprintf('Sorting completed!\n')
+    % % ~~~~~~ RUN KILOSORT ~~~~~~  
+    % fprintf('Initializing Kilosort4...\n')
+    % py.kilosort.run_kilosort(settings=run_settings, probe=cur_probe, ...
+    %     filename=py.str(temp_file), bad_channels=py.list(num2cell(int16(ops.badchannels-1))), ...
+    %     save_preprocessed_copy=py.bool(false),...
+    %     do_CAR=py.bool(~ops.CAR));
+    % fprintf('Sorting completed!\n')
 
+    % ~~~~~~ RUN KILOSORT ~~~~~~ %%% changed on 5/29 MWM error when bad
+    % there was no bad channels
+fprintf('Initializing Kilosort4...\n')
+
+% Convert MATLAB bad channel list to Python list (0-indexed)
+if isempty(ops.badchannels)
+    bad_channels_py = py.list();
+else
+    bad_channels_mat = int16(ops.badchannels(:)' - 1); % force row vector
+    bad_channels_py = py.list(num2cell(bad_channels_mat));
+end
+
+py.kilosort.run_kilosort( ...
+    settings=run_settings, ...
+    probe=cur_probe, ...
+    filename=py.str(temp_file), ...
+    bad_channels=bad_channels_py, ...
+    save_preprocessed_copy=py.bool(false), ...
+    do_CAR=py.bool(~ops.CAR));
+
+fprintf('Sorting completed!\n')
     % ~~~~~~~~~~~~~~~~~~~~~~~~~~
     
     % Kilosort bugs out when selecting a different output folder than input
